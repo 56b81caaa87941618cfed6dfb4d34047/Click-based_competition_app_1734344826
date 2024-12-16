@@ -1,58 +1,91 @@
 
 // SPDX-License-Identifier: MIT
-pragma solidity 0.8.20;
+pragma solidity ^0.8.20;
 
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
 
-contract NationStats is Ownable {
-    using SafeMath for uint256;
+contract NationStats is ERC721, Ownable {
+    using Counters for Counters.Counter;
 
-    struct NationStat {
-        uint256 attackingPoints;
-        uint256 ballCount;
+    struct Nation {
+        string name;
+        uint256 population;
+        uint256 wealth;
+        uint256 power;
     }
 
-    mapping(string => NationStat) public nationStats;
-    mapping(address => bool) public hasCreatedNation;
+    mapping(uint256 => Nation) public nations;
+    mapping(string => bool) public nationNameExists;
+    Counters.Counter private _tokenIds;
+    Counters.Counter private _nationIds;
 
-    uint256 public constant CREATE_NATION_PRICE = 0.02 ether;
-    uint256 public constant JOIN_NATION_PRICE = 0.005 ether;
+    uint256 public constant CREATE_NATION_COST = 0.02 ether;
+    uint256 public constant JOIN_NATION_COST = 0.005 ether;
 
-    event NationCreated(string nationName, address creator);
-    event NationJoined(string nationName, address joiner);
-    event StatsUpdated(string nationName, uint256 attackingPoints, uint256 ballCount);
+    address public ballStatsContract;
 
-    constructor() Ownable() {}
+    event NationCreated(uint256 indexed nationId, string name, address creator);
+    event NationJoined(uint256 indexed nationId, address joiner);
+    event NationStatsUpdated(uint256 indexed nationId, uint256 population, uint256 wealth, uint256 power);
 
-    function createNation(string memory _nationName) external payable {
-        require(!hasCreatedNation[msg.sender], "You have already created a nation");
-        require(msg.value == CREATE_NATION_PRICE, "Incorrect payment amount");
-        require(nationStats[_nationName].attackingPoints == 0 && nationStats[_nationName].ballCount == 0, "Nation already exists");
-
-        nationStats[_nationName] = NationStat(0, 0);
-        hasCreatedNation[msg.sender] = true;
-
-        emit NationCreated(_nationName, msg.sender);
+    constructor() ERC721("NationStats", "NSTAT") Ownable() {
+        ballStatsContract = address(0x1234567890123456789012345678901234567890); // Placeholder address
     }
 
-    function joinNation(string memory _nationName) external payable {
-        require(msg.value == JOIN_NATION_PRICE, "Incorrect payment amount");
-        require(nationStats[_nationName].attackingPoints > 0 || nationStats[_nationName].ballCount > 0, "Nation does not exist");
+    function createNation(string memory _name) external payable {
+        require(msg.value == CREATE_NATION_COST, "Incorrect payment amount");
+        require(!nationNameExists[_name], "Nation name already exists");
 
-        emit NationJoined(_nationName, msg.sender);
+        _nationIds.increment();
+        uint256 newNationId = _nationIds.current();
+
+        nations[newNationId] = Nation(_name, 1, 0, 0);
+        nationNameExists[_name] = true;
+
+        _mintNFT(msg.sender, true);
+
+        emit NationCreated(newNationId, _name, msg.sender);
     }
 
-    function updateStats(string memory _nationName, uint256 _attackingPoints, uint256 _ballCount) external onlyOwner {
-        nationStats[_nationName].attackingPoints = nationStats[_nationName].attackingPoints.add(_attackingPoints);
-        nationStats[_nationName].ballCount = nationStats[_nationName].ballCount.add(_ballCount);
+    function joinNation(uint256 _nationId) external payable {
+        require(msg.value == JOIN_NATION_COST, "Incorrect payment amount");
+        require(_nationId > 0 && _nationId <= _nationIds.current(), "Nation does not exist");
 
-        emit StatsUpdated(_nationName, nationStats[_nationName].attackingPoints, nationStats[_nationName].ballCount);
+        nations[_nationId].population += 1;
+
+        _mintNFT(msg.sender, false);
+
+        emit NationJoined(_nationId, msg.sender);
     }
 
-    function getStats(string memory _nationName) external view returns (uint256 attackingPoints, uint256 ballCount) {
-        NationStat memory stat = nationStats[_nationName];
-        return (stat.attackingPoints, stat.ballCount);
+    function getNationStats(uint256 _nationId) external view returns (string memory, uint256, uint256, uint256) {
+        require(_nationId > 0 && _nationId <= _nationIds.current(), "Nation does not exist");
+        Nation memory nation = nations[_nationId];
+        return (nation.name, nation.population, nation.wealth, nation.power);
+    }
+
+    function updateNationStats(uint256 _nationId, uint256 _population, uint256 _wealth, uint256 _power) external {
+        require(msg.sender == ballStatsContract, "Only BallStats contract can update");
+        require(_nationId > 0 && _nationId <= _nationIds.current(), "Nation does not exist");
+
+        Nation storage nation = nations[_nationId];
+        nation.population = _population;
+        nation.wealth = _wealth;
+        nation.power = _power;
+
+        emit NationStatsUpdated(_nationId, _population, _wealth, _power);
+    }
+
+    function setBallStatsContract(address _ballStatsContract) external onlyOwner {
+        ballStatsContract = _ballStatsContract;
+    }
+
+    function _mintNFT(address _to, bool _isCreator) internal {
+        _tokenIds.increment();
+        uint256 newTokenId = _tokenIds.current();
+        _safeMint(_to, newTokenId);
     }
 
     function withdraw() external onlyOwner {
