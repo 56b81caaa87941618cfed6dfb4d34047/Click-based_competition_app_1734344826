@@ -100,5 +100,13 @@
         "metadata": {
             "tool_call_id": "call_vzVrmocFaRgpbQmtfDCmcJn5"
         }
+    },
+    {
+        "id": "73ef59e6-4501-4150-a481-99302d70f742",
+        "timestamp": "2024-12-16T10:41:18.829250Z",
+        "role": "assistant",
+        "source": "base_assistant",
+        "content": "I've reconfigured the component so that the small circle image is the only content and is placed at the top right corner. What would you like to do next?",
+        "metadata": {}
     }
 ]
