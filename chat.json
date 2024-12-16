@@ -388,5 +388,15 @@
         "source": "smart_contract_assistant",
         "content": "The frontend for the BallStats contract has been successfully generated and added to the footer. The component includes all the functionalities like claiming balls, providing points, attacking balls, and managing nations. What would you like to do next?",
         "metadata": {}
+    },
+    {
+        "id": "ae276c37-f13b-4edb-a613-9e3848a240b6",
+        "timestamp": "2024-12-16T18:10:07.719974Z",
+        "role": "user",
+        "source": "web_client",
+        "content": "the thing is, the re should be a mutiple balls as images in the frontend component, and one should not need to put the ID but to click on it to see it so make balls and link them to the sc",
+        "metadata": {
+            "component_id": "Footer1734344829"
+        }
     }
 ]
