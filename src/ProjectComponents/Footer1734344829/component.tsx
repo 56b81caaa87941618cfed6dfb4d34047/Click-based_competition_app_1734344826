@@ -12,7 +12,8 @@ const ABI = [
   "function createNation(string memory _nation) external payable",
   "function joinNation(string memory _nation) external payable",
   "function getBallStats(uint256 _ballId) external view returns (address owner, uint256 points, string memory nation)",
-  "function getNationStats(string memory _nation) external view returns (uint256 memberCount, uint256 totalPoints)"
+  "function getNationStats(string memory _nation) external view returns (uint256 memberCount, uint256 totalPoints)",
+  "function userNation(address user) external view returns (string memory)"
 ];
 
 const BallStatsInteraction: React.FC = () => {
@@ -26,6 +27,8 @@ const BallStatsInteraction: React.FC = () => {
   const [pointsToReduce, setPointsToReduce] = React.useState('');
   const [error, setError] = React.useState('');
   const [success, setSuccess] = React.useState('');
+  const [userNation, setUserNation] = React.useState('');
+  const [nationStats, setNationStats] = React.useState<{memberCount: string, totalPoints: string} | null>(null);
 
   const connectWallet = async () => {
     try {
@@ -37,12 +40,40 @@ const BallStatsInteraction: React.FC = () => {
         const signer = provider.getSigner();
         const contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
         setContract(contract);
+        await getUserNation(contract, signer);
       } else {
         setError('Please install MetaMask!');
       }
     } catch (error) {
       console.error('Error connecting wallet:', error);
       setError('Error connecting wallet. Please try again.');
+    }
+  };
+
+  const getUserNation = async (contract: ethers.Contract, signer: ethers.Signer) => {
+    try {
+      const address = await signer.getAddress();
+      const userNation = await contract.userNation(address);
+      setUserNation(userNation);
+      if (userNation) {
+        await getNationStats(contract, userNation);
+      }
+    } catch (error) {
+      console.error('Error getting user nation:', error);
+      setError('Error getting user nation. Please try again.');
+    }
+  };
+
+  const getNationStats = async (contract: ethers.Contract, nationName: string) => {
+    try {
+      const stats = await contract.getNationStats(nationName);
+      setNationStats({
+        memberCount: stats[0].toString(),
+        totalPoints: stats[1].toString()
+      });
+    } catch (error) {
+      console.error('Error getting nation stats:', error);
+      setError('Error getting nation stats. Please try again.');
     }
   };
 
@@ -94,6 +125,7 @@ const BallStatsInteraction: React.FC = () => {
       await tx.wait();
       setSuccess(`Ball ${selectedBall} claimed for nation ${nation}`);
       await getBallStats(selectedBall);
+      await getNationStats(contract, nation);
     } catch (error) {
       console.error('Error claiming ball:', error);
       setError('Error claiming ball. Please try again.');
@@ -108,6 +140,7 @@ const BallStatsInteraction: React.FC = () => {
       await tx.wait();
       setSuccess(`${points} points provided to ball ${selectedBall}`);
       await getBallStats(selectedBall);
+      await getNationStats(contract, userNation);
     } catch (error) {
       console.error('Error providing points:', error);
       setError('Error providing points. Please try again.');
@@ -122,6 +155,7 @@ const BallStatsInteraction: React.FC = () => {
       await tx.wait();
       setSuccess(`Ball ${selectedBall} attacked ball ${targetBallId} with ${pointsToReduce} points`);
       await getBallStats(selectedBall);
+      await getNationStats(contract, userNation);
     } catch (error) {
       console.error('Error attacking ball:', error);
       setError('Error attacking ball. Please try again.');
@@ -135,6 +169,8 @@ const BallStatsInteraction: React.FC = () => {
       const tx = await contract.createNation(nation, { value: ethers.utils.parseEther('0.02') });
       await tx.wait();
       setSuccess(`Nation ${nation} created`);
+      setUserNation(nation);
+      await getNationStats(contract, nation);
     } catch (error) {
       console.error('Error creating nation:', error);
       setError('Error creating nation. Please try again.');
@@ -148,6 +184,8 @@ const BallStatsInteraction: React.FC = () => {
       const tx = await contract.joinNation(nation, { value: ethers.utils.parseEther('0.005') });
       await tx.wait();
       setSuccess(`Joined nation ${nation}`);
+      setUserNation(nation);
+      await getNationStats(contract, nation);
     } catch (error) {
       console.error('Error joining nation:', error);
       setError('Error joining nation. Please try again.');
@@ -160,6 +198,23 @@ const BallStatsInteraction: React.FC = () => {
 
       {error && <p className="text-red-500 mb-5">{error}</p>}
       {success && <p className="text-green-500 mb-5">{success}</p>}
+
+      <div className="bg-white p-5 rounded-lg shadow-md mb-5">
+        <h2 className="text-xl font-semibold mb-3">User Nation Information</h2>
+        {userNation ? (
+          <div>
+            <p>Your Nation: {userNation}</p>
+            {nationStats && (
+              <div>
+                <p>Member Count: {nationStats.memberCount}</p>
+                <p>Total Points: {nationStats.totalPoints}</p>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p>You haven't joined a nation yet.</p>
+        )}
+      </div>
 
       <div className="grid grid-cols-5 gap-2 mb-5">
         {[...Array(10)].map((_, index) => (
