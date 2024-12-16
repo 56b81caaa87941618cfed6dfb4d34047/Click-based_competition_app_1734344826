@@ -166,6 +166,18 @@ const BallStatsInteraction: React.FC = () => {
   return (
     <div className="p-5 bg-gray-100 min-h-screen">
       <h1 className="text-3xl font-bold mb-5">BallStats Interaction</h1>
+
+      <div className="flex items-center justify-center mb-5">
+        {[...Array(10)].map((_, index) => (
+          <img
+            key={index}
+            src={`https://raw.githubusercontent.com/56b81caaa87941618cfed6dfb4d34047/Click-based_competition_app_1734344826/${window.MI_PROJECT_GIT_REF || 'main'}/src/assets/images/4028adba92904271a467bac9a38ffdbf.jpeg`}
+            alt={`Small ball ${index + 1}`}
+            className="w-8 h-8 mx-1"
+          />
+        ))}
+      </div>
+      <h1 className="text-3xl font-bold mb-5">BallStats Interaction</h1>
       
       {error && <p className="text-red-500 mb-5">{error}</p>}
       {success && <p className="text-green-500 mb-5">{success}</p>}
