@@ -18,14 +18,12 @@ const ABI = [
 const BallStatsInteraction: React.FC = () => {
   const [provider, setProvider] = React.useState<ethers.providers.Web3Provider | null>(null);
   const [contract, setContract] = React.useState<ethers.Contract | null>(null);
-  const [ballId, setBallId] = React.useState('');
+  const [selectedBall, setSelectedBall] = React.useState<number | null>(null);
+  const [ballStats, setBallStats] = React.useState<{owner: string, points: string, nation: string} | null>(null);
   const [nation, setNation] = React.useState('');
   const [points, setPoints] = React.useState('');
-  const [attackerBallId, setAttackerBallId] = React.useState('');
   const [targetBallId, setTargetBallId] = React.useState('');
   const [pointsToReduce, setPointsToReduce] = React.useState('');
-  const [ballStats, setBallStats] = React.useState<{owner: string, points: string, nation: string} | null>(null);
-  const [nationStats, setNationStats] = React.useState<{memberCount: string, totalPoints: string} | null>(null);
   const [error, setError] = React.useState('');
   const [success, setSuccess] = React.useState('');
 
@@ -67,13 +65,35 @@ const BallStatsInteraction: React.FC = () => {
     }
   };
 
-  const claimBall = async () => {
+  const handleBallClick = async (ballId: number) => {
+    setSelectedBall(ballId);
+    await getBallStats(ballId);
+  };
+
+  const getBallStats = async (ballId: number) => {
     try {
       await checkAndSwitchChain();
       if (!contract) return;
-      const tx = await contract.claimBall(ballId, nation, { value: ethers.utils.parseEther('0.01') });
+      const stats = await contract.getBallStats(ballId);
+      setBallStats({
+        owner: stats[0],
+        points: stats[1].toString(),
+        nation: stats[2]
+      });
+    } catch (error) {
+      console.error('Error getting ball stats:', error);
+      setError('Error getting ball stats. Please try again.');
+    }
+  };
+
+  const claimBall = async () => {
+    try {
+      await checkAndSwitchChain();
+      if (!contract || selectedBall === null) return;
+      const tx = await contract.claimBall(selectedBall, nation, { value: ethers.utils.parseEther('0.01') });
       await tx.wait();
-      setSuccess(`Ball ${ballId} claimed for nation ${nation}`);
+      setSuccess(`Ball ${selectedBall} claimed for nation ${nation}`);
+      await getBallStats(selectedBall);
     } catch (error) {
       console.error('Error claiming ball:', error);
       setError('Error claiming ball. Please try again.');
@@ -83,10 +103,11 @@ const BallStatsInteraction: React.FC = () => {
   const provideBallPoints = async () => {
     try {
       await checkAndSwitchChain();
-      if (!contract) return;
-      const tx = await contract.provideBallPoints(ballId, points);
+      if (!contract || selectedBall === null) return;
+      const tx = await contract.provideBallPoints(selectedBall, points);
       await tx.wait();
-      setSuccess(`${points} points provided to ball ${ballId}`);
+      setSuccess(`${points} points provided to ball ${selectedBall}`);
+      await getBallStats(selectedBall);
     } catch (error) {
       console.error('Error providing points:', error);
       setError('Error providing points. Please try again.');
@@ -96,10 +117,11 @@ const BallStatsInteraction: React.FC = () => {
   const attackBall = async () => {
     try {
       await checkAndSwitchChain();
-      if (!contract) return;
-      const tx = await contract.attackBall(attackerBallId, targetBallId, pointsToReduce);
+      if (!contract || selectedBall === null) return;
+      const tx = await contract.attackBall(selectedBall, targetBallId, pointsToReduce);
       await tx.wait();
-      setSuccess(`Ball ${attackerBallId} attacked ball ${targetBallId} with ${pointsToReduce} points`);
+      setSuccess(`Ball ${selectedBall} attacked ball ${targetBallId} with ${pointsToReduce} points`);
+      await getBallStats(selectedBall);
     } catch (error) {
       console.error('Error attacking ball:', error);
       setError('Error attacking ball. Please try again.');
@@ -132,107 +154,57 @@ const BallStatsInteraction: React.FC = () => {
     }
   };
 
-  const getBallStats = async () => {
-    try {
-      await checkAndSwitchChain();
-      if (!contract) return;
-      const stats = await contract.getBallStats(ballId);
-      setBallStats({
-        owner: stats[0],
-        points: stats[1].toString(),
-        nation: stats[2]
-      });
-    } catch (error) {
-      console.error('Error getting ball stats:', error);
-      setError('Error getting ball stats. Please try again.');
-    }
-  };
-
-  const getNationStats = async () => {
-    try {
-      await checkAndSwitchChain();
-      if (!contract) return;
-      const stats = await contract.getNationStats(nation);
-      setNationStats({
-        memberCount: stats[0].toString(),
-        totalPoints: stats[1].toString()
-      });
-    } catch (error) {
-      console.error('Error getting nation stats:', error);
-      setError('Error getting nation stats. Please try again.');
-    }
-  };
-
   return (
     <div className="p-5 bg-gray-100 min-h-screen">
       <h1 className="text-3xl font-bold mb-5">BallStats Interaction</h1>
-      
+
       {error && <p className="text-red-500 mb-5">{error}</p>}
       {success && <p className="text-green-500 mb-5">{success}</p>}
 
-      <button onClick={connectWallet} className="bg-blue-500 text-white p-2 rounded mb-5">
-        Connect Wallet
-      </button>
+      <div className="grid grid-cols-5 gap-2 mb-5">
+        {[...Array(10)].map((_, index) => (
+          <img
+            key={index}
+            src={`https://raw.githubusercontent.com/56b81caaa87941618cfed6dfb4d34047/Click-based_competition_app_1734344826/${window.MI_PROJECT_GIT_REF || 'main'}/src/assets/images/4028adba92904271a467bac9a38ffdbf.jpeg`}
+            alt={`Ball ${index + 1}`}
+            className="w-full h-auto cursor-pointer rounded-full border-4 border-transparent hover:border-blue-500"
+            onClick={() => handleBallClick(index + 1)}
+          />
+        ))}
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-        <div className="bg-white p-5 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-3">Claim Ball</h2>
-          <input type="number" placeholder="Ball ID" value={ballId} onChange={(e) => setBallId(e.target.value)} className="w-full p-2 mb-2 border rounded" />
-          <input type="text" placeholder="Nation" value={nation} onChange={(e) => setNation(e.target.value)} className="w-full p-2 mb-2 border rounded" />
-          <button onClick={claimBall} className="bg-green-500 text-white p-2 rounded">Claim Ball</button>
-        </div>
-
-        <div className="bg-white p-5 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-3">Provide Ball Points</h2>
-          <input type="number" placeholder="Ball ID" value={ballId} onChange={(e) => setBallId(e.target.value)} className="w-full p-2 mb-2 border rounded" />
-          <input type="number" placeholder="Points" value={points} onChange={(e) => setPoints(e.target.value)} className="w-full p-2 mb-2 border rounded" />
-          <button onClick={provideBallPoints} className="bg-green-500 text-white p-2 rounded">Provide Points</button>
-        </div>
-
-        <div className="bg-white p-5 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-3">Attack Ball</h2>
-          <input type="number" placeholder="Attacker Ball ID" value={attackerBallId} onChange={(e) => setAttackerBallId(e.target.value)} className="w-full p-2 mb-2 border rounded" />
-          <input type="number" placeholder="Target Ball ID" value={targetBallId} onChange={(e) => setTargetBallId(e.target.value)} className="w-full p-2 mb-2 border rounded" />
-          <input type="number" placeholder="Points to Reduce" value={pointsToReduce} onChange={(e) => setPointsToReduce(e.target.value)} className="w-full p-2 mb-2 border rounded" />
-          <button onClick={attackBall} className="bg-red-500 text-white p-2 rounded">Attack Ball</button>
-        </div>
-
-        <div className="bg-white p-5 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-3">Create Nation</h2>
-          <input type="text" placeholder="Nation Name" value={nation} onChange={(e) => setNation(e.target.value)} className="w-full p-2 mb-2 border rounded" />
-          <button onClick={createNation} className="bg-purple-500 text-white p-2 rounded">Create Nation</button>
-        </div>
-
-        <div className="bg-white p-5 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-3">Join Nation</h2>
-          <input type="text" placeholder="Nation Name" value={nation} onChange={(e) => setNation(e.target.value)} className="w-full p-2 mb-2 border rounded" />
-          <button onClick={joinNation} className="bg-yellow-500 text-white p-2 rounded">Join Nation</button>
-        </div>
-
-        <div className="bg-white p-5 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-3">Get Ball Stats</h2>
-          <input type="number" placeholder="Ball ID" value={ballId} onChange={(e) => setBallId(e.target.value)} className="w-full p-2 mb-2 border rounded" />
-          <button onClick={getBallStats} className="bg-blue-500 text-white p-2 rounded mb-2">Get Ball Stats</button>
-          {ballStats && (
+      {selectedBall !== null && (
+        <div className="bg-white p-5 rounded-lg shadow-md mb-5">
+          <h2 className="text-xl font-semibold mb-3">Ball {selectedBall} Information</h2>
+          {ballStats ? (
             <div>
               <p>Owner: {ballStats.owner}</p>
               <p>Points: {ballStats.points}</p>
               <p>Nation: {ballStats.nation}</p>
             </div>
+          ) : (
+            <p>Loading ball information...</p>
           )}
-        </div>
 
-        <div className="bg-white p-5 rounded-lg shadow-md">
-          <h2 className="text-xl font-semibold mb-3">Get Nation Stats</h2>
-          <input type="text" placeholder="Nation Name" value={nation} onChange={(e) => setNation(e.target.value)} className="w-full p-2 mb-2 border rounded" />
-          <button onClick={getNationStats} className="bg-blue-500 text-white p-2 rounded mb-2">Get Nation Stats</button>
-          {nationStats && (
-            <div>
-              <p>Member Count: {nationStats.memberCount}</p>
-              <p>Total Points: {nationStats.totalPoints}</p>
-            </div>
-          )}
+          <div className="mt-3">
+            <input type="text" placeholder="Nation" value={nation} onChange={(e) => setNation(e.target.value)} className="w-full p-2 mb-2 border rounded" />
+            <button onClick={claimBall} className="bg-green-500 text-white p-2 rounded mr-2">Claim Ball</button>
+            
+            <input type="number" placeholder="Points" value={points} onChange={(e) => setPoints(e.target.value)} className="w-full p-2 mb-2 border rounded" />
+            <button onClick={provideBallPoints} className="bg-blue-500 text-white p-2 rounded mr-2">Provide Points</button>
+            
+            <input type="number" placeholder="Target Ball ID" value={targetBallId} onChange={(e) => setTargetBallId(e.target.value)} className="w-full p-2 mb-2 border rounded" />
+            <input type="number" placeholder="Points to Reduce" value={pointsToReduce} onChange={(e) => setPointsToReduce(e.target.value)} className="w-full p-2 mb-2 border rounded" />
+            <button onClick={attackBall} className="bg-red-500 text-white p-2 rounded">Attack Ball</button>
+          </div>
         </div>
+      )}
+
+      <div className="bg-white p-5 rounded-lg shadow-md">
+        <h2 className="text-xl font-semibold mb-3">Nation Management</h2>
+        <input type="text" placeholder="Nation Name" value={nation} onChange={(e) => setNation(e.target.value)} className="w-full p-2 mb-2 border rounded" />
+        <button onClick={createNation} className="bg-purple-500 text-white p-2 rounded mr-2">Create Nation</button>
+        <button onClick={joinNation} className="bg-yellow-500 text-white p-2 rounded">Join Nation</button>
       </div>
     </div>
   );
