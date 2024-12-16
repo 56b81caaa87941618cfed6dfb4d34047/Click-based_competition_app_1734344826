@@ -497,5 +497,15 @@
         "source": "base_assistant",
         "content": "I have generated 10 clickable ball images and linked them to the BallStats smart contract. You can now interact with each ball by clicking on the images to see their information and perform actions like claiming, providing points, and attacking. What would you like to do next?",
         "metadata": {}
+    },
+    {
+        "id": "5f0ccb53-d434-41e1-bdf2-d4e6277b1406",
+        "timestamp": "2024-12-16T18:13:18.317151Z",
+        "role": "user",
+        "source": "web_client",
+        "content": "I should be able to see here what it my nation and the stats of it",
+        "metadata": {
+            "component_id": "Header1734344829"
+        }
     }
 ]
