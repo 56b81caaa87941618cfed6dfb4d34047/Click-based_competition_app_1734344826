@@ -8,9 +8,9 @@ const NationStatsHeader: React.FC = () => {
   const [chainId, setChainId] = React.useState<number | null>(null);
   const [createNationName, setCreateNationName] = React.useState('');
   const [joinNationName, setJoinNationName] = React.useState('');
-  const [viewNationName, setViewNationName] = React.useState('');
-  const [nationStats, setNationStats] = React.useState<{ attackingPoints: string; ballCount: string } | null>(null);
+  const [allNationStats, setAllNationStats] = React.useState<{ [key: string]: { attackingPoints: string; ballCount: string } }>({});
   const [status, setStatus] = React.useState('');
+  const [knownNations, setKnownNations] = React.useState<string[]>([]);
 
   const contractAddress = '0xeD0316730198ECF315C78Ba64A88f95f9e92Cc1f';
   const chainIdRequired = 17000;
@@ -74,7 +74,9 @@ const NationStatsHeader: React.FC = () => {
         setStatus('Creating nation... Please wait.');
         await tx.wait();
         setStatus(`Nation "${createNationName}" created successfully!`);
+        setKnownNations(prev => [...prev, createNationName]);
         setCreateNationName('');
+        fetchAllNationStats();
       } catch (error) {
         console.error('Error creating nation:', error);
         setStatus('Failed to create nation. Please try again.');
@@ -98,7 +100,9 @@ const NationStatsHeader: React.FC = () => {
         setStatus('Joining nation... Please wait.');
         await tx.wait();
         setStatus(`Successfully joined nation "${joinNationName}"!`);
+        setKnownNations(prev => [...prev, joinNationName]);
         setJoinNationName('');
+        fetchAllNationStats();
       } catch (error) {
         console.error('Error joining nation:', error);
         setStatus('Failed to join nation. Please try again.');
@@ -106,29 +110,34 @@ const NationStatsHeader: React.FC = () => {
     }
   };
 
-  const getStats = async () => {
-    if (!walletConnected) {
-      await connectWallet();
-    }
-    if (chainId !== chainIdRequired) {
-      await switchChain();
-    }
-    if (viewNationName && walletConnected && chainId === chainIdRequired) {
-      try {
-        const provider = new ethers.providers.Web3Provider(window.ethereum);
-        const contract = new ethers.Contract(contractAddress, abi, provider);
-        const [attackingPoints, ballCount] = await contract.getStats(viewNationName);
-        setNationStats({
+  const fetchAllNationStats = async () => {
+    if (!walletConnected || chainId !== chainIdRequired) return;
+
+    try {
+      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const contract = new ethers.Contract(contractAddress, abi, provider);
+      const stats: { [key: string]: { attackingPoints: string; ballCount: string } } = {};
+
+      for (const nationName of knownNations) {
+        const [attackingPoints, ballCount] = await contract.getStats(nationName);
+        stats[nationName] = {
           attackingPoints: attackingPoints.toString(),
           ballCount: ballCount.toString()
-        });
-        setStatus(`Stats retrieved for nation "${viewNationName}".`);
-      } catch (error) {
-        console.error('Error getting stats:', error);
-        setStatus('Failed to get nation stats. Please try again.');
+        };
       }
+
+      setAllNationStats(stats);
+    } catch (error) {
+      console.error('Error fetching all nation stats:', error);
+      setStatus('Failed to fetch nation stats. Please try again.');
     }
   };
+
+  React.useEffect(() => {
+    if (walletConnected && chainId === chainIdRequired) {
+      fetchAllNationStats();
+    }
+  }, [walletConnected, chainId, knownNations]);
 
   return (
     <div className="bg-gray-100 p-5 rounded-lg shadow-md">
@@ -145,7 +154,29 @@ const NationStatsHeader: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="mb-5">
+        <h2 className="text-xl font-semibold mb-2">All Nation Stats</h2>
+        <table className="w-full bg-white shadow-md rounded-lg overflow-hidden">
+          <thead className="bg-gray-200">
+            <tr>
+              <th className="p-2 text-left">Nation Name</th>
+              <th className="p-2 text-left">Attacking Points</th>
+              <th className="p-2 text-left">Ball Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            {Object.entries(allNationStats).map(([nationName, stats]) => (
+              <tr key={nationName} className="border-b">
+                <td className="p-2">{nationName}</td>
+                <td className="p-2">{stats.attackingPoints}</td>
+                <td className="p-2">{stats.ballCount}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <h2 className="text-xl font-semibold mb-2">Create Nation</h2>
           <input
@@ -173,29 +204,7 @@ const NationStatsHeader: React.FC = () => {
             Join Nation (0.005 ETH)
           </button>
         </div>
-
-        <div>
-          <h2 className="text-xl font-semibold mb-2">View Nation Stats</h2>
-          <input
-            type="text"
-            value={viewNationName}
-            onChange={(e) => setViewNationName(e.target.value)}
-            placeholder="Nation Name"
-            className="w-full p-2 mb-2 border rounded"
-          />
-          <button onClick={getStats} className="bg-purple-500 text-white px-4 py-2 rounded w-full">
-            Get Stats
-          </button>
-        </div>
       </div>
-
-      {nationStats && (
-        <div className="mt-5 p-4 bg-white rounded shadow">
-          <h3 className="text-lg font-semibold mb-2">Nation Stats:</h3>
-          <p>Attacking Points: {nationStats.attackingPoints}</p>
-          <p>Ball Count: {nationStats.ballCount}</p>
-        </div>
-      )}
 
       {status && (
         <div className="mt-5 p-4 bg-blue-100 text-blue-700 rounded">
