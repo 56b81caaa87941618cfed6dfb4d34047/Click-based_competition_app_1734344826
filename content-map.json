@@ -1,0 +1,23 @@
+{
+    "name": "example",
+    "prefix": "%#PLACEHOLDER",
+    "placeholderMappings": {
+        "Header": [
+            "APPLICATION_NAME"
+        ],
+        "Hero": [
+            "HERO_HEADING_TEXT",
+            "HERO_SUBHEADING_TEXT"
+        ],
+        "Footer": [
+            "APPLICATION_NAME",
+            "FOOTER_TEXT"
+        ]
+    },
+    "placeholders": {
+        "APPLICATION_NAME": "ClickWars",
+        "HERO_HEADING_TEXT": "Dominate the Battlefield with Every Click!",
+        "HERO_SUBHEADING_TEXT": "Engage in epic online battles where strategy meets speed. Can you outclick your opponents and rise to the top?",
+        "FOOTER_TEXT": "\u00a9 2023 ClickWars. All rights reserved. May the fastest clicker win!"
+    }
+}
