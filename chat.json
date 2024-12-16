@@ -981,5 +981,15 @@
         "source": "smart_contract_assistant",
         "content": "The Hero component has been updated to display user stats, including their nation and related statistics. You can now view these details directly in the Hero section. What would you like to do next?",
         "metadata": {}
+    },
+    {
+        "id": "645c918f-f8d7-4f3e-8704-27f4b6c31c23",
+        "timestamp": "2024-12-16T18:31:32.771450Z",
+        "role": "user",
+        "source": "web_client",
+        "content": "The stats of the nations should be a table always ready (in the header) I should not need to know the names of the nation",
+        "metadata": {
+            "component_id": "Hero1734344829"
+        }
     }
 ]
