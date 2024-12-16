@@ -675,5 +675,15 @@
         "source": "smart_contract_assistant",
         "content": "The BallStats smart contract has been successfully deployed on the Holesky network at address: 0xc0B2E992c8A31455BE8542ED6aB9366217AEF5F3. The frontend component to interact with this contract is now available. What would you like to do next?",
         "metadata": {}
+    },
+    {
+        "id": "0f83cb04-ae3c-4e4e-9940-f2fa58ac99a4",
+        "timestamp": "2024-12-16T18:20:43.180240Z",
+        "role": "user",
+        "source": "web_client",
+        "content": "adapt the fronted as it is for the new sc",
+        "metadata": {
+            "component_id": "Footer1734344829"
+        }
     }
 ]
