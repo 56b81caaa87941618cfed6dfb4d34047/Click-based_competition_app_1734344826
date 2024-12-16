@@ -1083,5 +1083,15 @@
         "source": "smart_contract_assistant",
         "content": "I have fixed the issue. You should now be able to create a nation without any problems. Please try again and let me know if you encounter any further issues.",
         "metadata": {}
+    },
+    {
+        "id": "82f847fe-a8b1-406c-897f-1f0fd3f8506c",
+        "timestamp": "2024-12-16T18:36:20.676128Z",
+        "role": "user",
+        "source": "web_client",
+        "content": "i am creating a nation but I am not getting an nft",
+        "metadata": {
+            "component_id": "Header1734344829"
+        }
     }
 ]
