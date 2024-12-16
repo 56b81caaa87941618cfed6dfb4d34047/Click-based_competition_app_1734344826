@@ -286,5 +286,15 @@
         "source": "smart_contract_assistant",
         "content": "The BallStats smart contract has been generated. Would you like to deploy it now?",
         "metadata": {}
+    },
+    {
+        "id": "c18c2c33-0bdd-49d3-8554-0e9ed01ac3ea",
+        "timestamp": "2024-12-16T10:55:34.020484Z",
+        "role": "user",
+        "source": "web_client",
+        "content": "yes",
+        "metadata": {
+            "component_id": "Hero1734344829"
+        }
     }
 ]
