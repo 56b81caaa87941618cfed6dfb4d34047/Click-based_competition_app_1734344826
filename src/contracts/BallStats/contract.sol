@@ -3,10 +3,10 @@
 pragma solidity 0.8.20;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract BallStats is Ownable {
-    using SafeMath for uint256;
+    using SafeERC20 for IERC20;
 
     struct Ball {
         address owner;
@@ -15,112 +15,116 @@ contract BallStats is Ownable {
     }
 
     struct Nation {
-        uint256 memberCount;
-        uint256 totalPoints;
+        bool exists;
+        uint256 points;
     }
 
     mapping(uint256 => Ball) public balls;
+    mapping(address => mapping(string => uint256)) public userPoints;
     mapping(string => Nation) public nations;
-    mapping(address => string) public userNation;
 
     uint256 public constant CLAIM_COST = 0.01 ether;
     uint256 public constant CREATE_NATION_COST = 0.02 ether;
-    uint256 public constant SWITCH_NATION_COST = 0.005 ether;
+    uint256 public constant JOIN_NATION_COST = 0.005 ether;
     uint256 public constant INITIAL_BALL_POINTS = 100;
 
-    event BallClaimed(uint256 indexed ballId, address indexed owner, string nation);
-    event PointsProvided(uint256 indexed ballId, uint256 points);
-    event BallAttacked(uint256 indexed attackerBallId, uint256 indexed targetBallId, uint256 pointsReduced);
-    event NationCreated(string nation, address creator);
-    event NationJoined(address user, string nation);
-    event OwnershipChanged(uint256 indexed ballId, address indexed newOwner, string newNation);
+    address public nationStatsContract;
 
-    constructor() Ownable() {}
+    event BallClaimed(uint256 indexed ballId, address indexed owner, string nation);
+    event BallAttacked(uint256 indexed ballId, address indexed attacker, uint256 pointsReduced);
+    event PointsProvided(uint256 indexed ballId, address indexed provider, uint256 pointsAdded);
+    event PointsTransferred(address indexed from, address indexed to, string nation, uint256 points);
+    event NationCreated(string indexed nation, address indexed creator);
+    event NationJoined(string indexed nation, address indexed member);
+    event NationStatsContractUpdated(address indexed newContract);
+    event Withdrawn(address indexed to, uint256 amount);
+
+    constructor() Ownable() {
+        nationStatsContract = address(0x1234567890123456789012345678901234567890); // Placeholder address
+    }
+
+    function setNationStatsContract(address _nationStatsContract) external onlyOwner {
+        nationStatsContract = _nationStatsContract;
+        emit NationStatsContractUpdated(_nationStatsContract);
+    }
 
     function claimBall(uint256 _ballId, string memory _nation) external payable {
         require(msg.value == CLAIM_COST, "Incorrect payment amount");
         require(balls[_ballId].owner == address(0), "Ball already claimed");
-        require(bytes(userNation[msg.sender]).length > 0, "User must belong to a nation");
+        require(nations[_nation].exists, "Nation does not exist");
 
         balls[_ballId] = Ball(msg.sender, INITIAL_BALL_POINTS, _nation);
-        nations[_nation].totalPoints = nations[_nation].totalPoints.add(INITIAL_BALL_POINTS);
-
         emit BallClaimed(_ballId, msg.sender, _nation);
     }
 
-    function provideBallPoints(uint256 _ballId, uint256 _points) external {
-        require(balls[_ballId].owner == msg.sender, "Not the ball owner");
+    function attackBall(uint256 _ballId, uint256 _points) external {
+        require(balls[_ballId].owner != address(0), "Ball does not exist");
+        require(balls[_ballId].owner != msg.sender, "Cannot attack own ball");
+        require(_points <= userPoints[msg.sender][balls[_ballId].nation], "Insufficient points");
 
-        balls[_ballId].points = balls[_ballId].points.add(_points);
-        nations[balls[_ballId].nation].totalPoints = nations[balls[_ballId].nation].totalPoints.add(_points);
+        uint256 reducedPoints = _points < balls[_ballId].points ? _points : balls[_ballId].points;
+        balls[_ballId].points -= reducedPoints;
+        userPoints[msg.sender][balls[_ballId].nation] -= reducedPoints;
 
-        emit PointsProvided(_ballId, _points);
-    }
-
-    function attackBall(uint256 _attackerBallId, uint256 _targetBallId, uint256 _pointsToReduce) external {
-        require(balls[_attackerBallId].owner == msg.sender, "Not the attacker ball owner");
-        require(balls[_targetBallId].owner != address(0), "Target ball does not exist");
-        require(balls[_attackerBallId].points >= _pointsToReduce, "Not enough points to attack");
-
-        balls[_attackerBallId].points = balls[_attackerBallId].points.sub(_pointsToReduce);
-        nations[balls[_attackerBallId].nation].totalPoints = nations[balls[_attackerBallId].nation].totalPoints.sub(_pointsToReduce);
-
-        if (_pointsToReduce >= balls[_targetBallId].points) {
-            uint256 remainingPoints = _pointsToReduce.sub(balls[_targetBallId].points);
-            nations[balls[_targetBallId].nation].totalPoints = nations[balls[_targetBallId].nation].totalPoints.sub(balls[_targetBallId].points);
-            
-            balls[_targetBallId].points = remainingPoints;
-            balls[_targetBallId].owner = msg.sender;
-            balls[_targetBallId].nation = balls[_attackerBallId].nation;
-            
-            nations[balls[_attackerBallId].nation].totalPoints = nations[balls[_attackerBallId].nation].totalPoints.add(remainingPoints);
-
-            emit OwnershipChanged(_targetBallId, msg.sender, balls[_attackerBallId].nation);
-        } else {
-            balls[_targetBallId].points = balls[_targetBallId].points.sub(_pointsToReduce);
-            nations[balls[_targetBallId].nation].totalPoints = nations[balls[_targetBallId].nation].totalPoints.sub(_pointsToReduce);
+        if (balls[_ballId].points == 0) {
+            balls[_ballId].owner = msg.sender;
         }
 
-        emit BallAttacked(_attackerBallId, _targetBallId, _pointsToReduce);
+        emit BallAttacked(_ballId, msg.sender, reducedPoints);
+        syncStats(balls[_ballId].nation);
+    }
+
+    function providePoints(uint256 _ballId, uint256 _points) external {
+        require(balls[_ballId].owner == msg.sender, "Not the ball owner");
+        require(_points <= userPoints[msg.sender][balls[_ballId].nation], "Insufficient points");
+
+        balls[_ballId].points += _points;
+        userPoints[msg.sender][balls[_ballId].nation] -= _points;
+
+        emit PointsProvided(_ballId, msg.sender, _points);
+        syncStats(balls[_ballId].nation);
+    }
+
+    function transferPoints(address _to, string memory _nation, uint256 _points) external {
+        require(userPoints[msg.sender][_nation] >= _points, "Insufficient points");
+
+        userPoints[msg.sender][_nation] -= _points;
+        userPoints[_to][_nation] += _points;
+
+        emit PointsTransferred(msg.sender, _to, _nation, _points);
     }
 
     function createNation(string memory _nation) external payable {
         require(msg.value == CREATE_NATION_COST, "Incorrect payment amount");
-        require(nations[_nation].memberCount == 0, "Nation already exists");
+        require(!nations[_nation].exists, "Nation already exists");
 
-        nations[_nation].memberCount = 1;
-        userNation[msg.sender] = _nation;
-
+        nations[_nation] = Nation(true, 0);
         emit NationCreated(_nation, msg.sender);
     }
 
     function joinNation(string memory _nation) external payable {
-        require(nations[_nation].memberCount > 0, "Nation does not exist");
-        
-        if (bytes(userNation[msg.sender]).length > 0) {
-            require(msg.value == SWITCH_NATION_COST, "Incorrect payment amount for switching nation");
-            nations[userNation[msg.sender]].memberCount = nations[userNation[msg.sender]].memberCount.sub(1);
-        } else {
-            require(msg.value == 0, "Payment not required for first join");
-        }
+        require(msg.value == JOIN_NATION_COST, "Incorrect payment amount");
+        require(nations[_nation].exists, "Nation does not exist");
 
-        userNation[msg.sender] = _nation;
-        nations[_nation].memberCount = nations[_nation].memberCount.add(1);
-
-        emit NationJoined(msg.sender, _nation);
+        emit NationJoined(_nation, msg.sender);
     }
 
-    function getBallStats(uint256 _ballId) external view returns (address owner, uint256 points, string memory nation) {
-        Ball memory ball = balls[_ballId];
-        return (ball.owner, ball.points, ball.nation);
-    }
-
-    function getNationStats(string memory _nation) external view returns (uint256 memberCount, uint256 totalPoints) {
-        Nation memory nation = nations[_nation];
-        return (nation.memberCount, nation.totalPoints);
+    function syncStats(string memory _nation) internal {
+        (bool success, ) = nationStatsContract.call(abi.encodeWithSignature("updateStats(string)", _nation));
+        require(success, "Failed to sync stats");
     }
 
     function withdraw() external onlyOwner {
-        payable(owner()).transfer(address(this).balance);
+        uint256 balance = address(this).balance;
+        require(balance > 0, "No funds to withdraw");
+        
+        (bool success, ) = payable(owner()).call{value: balance}("");
+        require(success, "Withdrawal failed");
+        
+        emit Withdrawn(owner(), balance);
+    }
+
+    receive() external payable {
+        // Allow the contract to receive ETH
     }
 }
